@@ -44,31 +44,32 @@ def step_time(model, optimizer, criterion, image, label):
         avg_loss += ((loss.data.item() - avg_loss) / (t + 1))
     return avg_loss
 
-def step_pixel_recur(model, optimizer, criterion, image, label):
-    reset_every_t = 8
-    
-    image = Variable(image).unsqueeze(0) # batch dimension                
-    # Do one time step at a time
-    avg_loss = 0.0
-    model.init_hidden_state() # subjects don't share states
-    for t in range(label.shape[0] - 1):        
-        f_in = label[t].unsqueeze(0) # current frame
-        f_out = label[t + 1].unsqueeze(0) # next frame
-        
-        optimizer.zero_grad()
-        output = model((f_in, f_out, image))
-        loss = criterion(output, f_out)
-        
-        if t % reset_every_t == reset_every_t - 1:
-            # keep old state but remove graph to save memory.
-            loss.backward()
-            model.detach_hidden_state()
-        else:
-            loss.backward(retain_graph = True)
-        optimizer.step()
-        
-        avg_loss += ((loss.data.item() - avg_loss) / (t + 1))
-    return avg_loss
+def step_pixel_recur(reset_every_t):
+    def f(model, optimizer, criterion, image, label):
+        image = Variable(image).unsqueeze(0) # batch dimension                
+        # Do one time step at a time
+        avg_loss = 0.0
+        model.init_hidden_state() # subjects don't share states
+        for t in range(label.shape[0] - 1):        
+            print(t)
+            f_in = label[t].unsqueeze(0) # current frame
+            f_out = label[t + 1].unsqueeze(0) # next frame
+            
+            optimizer.zero_grad()
+            output = model((f_in, f_out, image))
+            loss = criterion(output, f_out)
+            
+            if t % reset_every_t == reset_every_t - 1:
+                # keep old state but remove graph to save memory.
+                loss.backward()
+                model.detach_hidden_state()
+            else:
+                loss.backward(retain_graph = True)
+            optimizer.step()
+            
+            avg_loss += ((loss.data.item() - avg_loss) / (t + 1))
+        return avg_loss
+    return f
 
 def compute_loss_vanilla(dataset, criterion, model):
     """Given a model and dataset, computes average loss."""
@@ -207,7 +208,23 @@ def load_options(name):
         optimizer = optim.Adam
         criterion = mp.logistic_mixture_loss
         
-        step, compute_loss = step_pixel_recur, compute_loss_pixel_recur
+        step, compute_loss = step_pixel_recur(8), compute_loss_pixel_recur
+    if name == 'rest_vpn':
+        tr_rest = tm.Transforms((tm.ChannelDim(), tm.Transpose((4,0,1,2,3))), 
+                                apply_to = 'label')
+        tr_both = tm.Transforms((tm.Normalize(), tm.ToTensor()))
+        tr = mb.MultiModule((tr_rest, tr_both))
+        train = d.RestDataset('../data/train', tr)
+        test = d.RestDataset('../data/test', tr)
+        
+        image, label = train[0]
+        ch, shape = label.shape[1], np.array(label.shape[2:])
+        model = mv.ResPixelNet(ch, shape, 8)
+        
+        optimizer = optim.Adam
+        criterion = mp.logistic_mixture_loss
+        
+        step, compute_loss = step_pixel_recur(8), compute_loss_pixel_recur
     
     optimizer = optimizer(model.parameters())
     return {'dataset': (train, test), 'model': model, 'optimizer': optimizer, 

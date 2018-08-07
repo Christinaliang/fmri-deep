@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 import functions as f
+import model_blocks as mb
 import model_pixel as mp
 import model_transition as mt
 
@@ -41,6 +42,40 @@ class VPN(nn.Module):
         self.state = self.encode(x, self.state)
         x = self.decode(x, self.state)
         return x
+    
+class ResPixelNet(VPN):
+    """Uses a simple stacked residual layer architecture with dilation for the
+    encoding. Pixel is used for decoding.
+    """
+    def __init__(self, ch, shape, state_ch,
+                 max_dil = 4, pix_depth = 10, pix_mix = 10):
+        super().__init__(state_ch, shape)
+        nn_ch = 16
+        blocks_per = 2
+        module_list = [mb.Block_7x7(ch + state_ch, nn_ch, shape)]
+        for i in range(max_dil):
+            dil = i + 1
+            for _ in range(blocks_per):
+                module_list.append(mb.ResBlock(nn_ch, shape, 3, dil = dil))
+                module_list.append(mb.ResBlock(nn_ch, shape, 3, dil = dil))
+        for i in range(max_dil):
+            dil = max_dil - i
+            for _ in range(blocks_per):
+                module_list.append(mb.ResBlock(nn_ch, shape, 3, dil = dil))
+                module_list.append(mb.ResBlock(nn_ch, shape, 3, dil = dil))
+        module_list.append(mb.Block_7x7(nn_ch, ch + state_ch, shape))
+        self.drn = mb.MultiModule(module_list)
+        self.pix = mp.PixelCNN(ch, shape, state_ch, 
+                               depth = pix_depth, num_mix = pix_mix)
+        
+    def encode(self, x, state):
+        f0, f1, _ = x
+        past_f = f.concat(f0, state)
+        return self.drn(past_f)
+    
+    def decode(self, x, state):
+        f0, f1, _ = x
+        return self.pix((f1, state))
 
 class WeightPixelNet(VPN):
     """Combines the WeightTransitionNet encoder and the PixelCNN decoder to

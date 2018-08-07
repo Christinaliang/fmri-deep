@@ -125,6 +125,11 @@ def read_file(match):
         return image
     return f
 
+def RestDataset(folder, transform):
+    return SubjectDataset(folder, transform, 
+                          read_image_label(lambda x: np.array([0, 1]), 
+                                           read_file('*mcf_brain.nii.gz')))
+
 def DTIRestDataset(folder, transform):
     return SubjectDataset(folder, transform, 
                 read_image_label(read_file('*tensor.nii.gz'), 
