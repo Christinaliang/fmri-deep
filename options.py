@@ -225,7 +225,30 @@ def load_options(name):
         criterion = mp.logistic_mixture_loss
         
         step, compute_loss = step_pixel_recur(8), compute_loss_pixel_recur
-    
+    if name == 'dti_rest_gate':
+        tr_dti = tm.Transforms((tm.Transpose((3,0,1,2)), tm.Decimate()),
+                               apply_to = 'image')
+        tr_rest = tm.Transforms((tm.ChannelDim(), tm.Transpose((4,0,1,2,3))), 
+                                apply_to = 'label')
+        tr_both = tm.Transforms((tm.Normalize(), tm.ToTensor()))
+        tr = mb.MultiModule((tr_dti, tr_rest, tr_both))
+        # DTI: 256 x 256 x 67 x 6: normalize, transpose(3,0,1,2), decimate
+        # Rest: 64 x 64 x 38 x 205: normalize, channeldim, transpose(4,0,1,2,3)
+        # splitting of time points is done in train_recurrent.
+        # DTI: 6 x 256 x 256 x 67
+        # Rest: 205 x 1 x 64 x 64 x 38
+        train = d.DTIRestDataset('../data/train', tr)
+        test = d.DTIRestDataset('../data/test', tr)
+        
+        image, label = train[0]
+        x_ch, x_shape = image.shape[0], np.array(image.shape[1:])
+        f_ch, f_shape = label.shape[1], np.array(label.shape[2:])
+        model = mv.GatePixelNet(f_ch, f_shape, x_ch, x_shape, 8)
+        
+        optimizer = optim.Adam
+        criterion = mp.logistic_mixture_loss
+        
+        step, compute_loss = step_pixel_recur(8), compute_loss_pixel_recur
     optimizer = optimizer(model.parameters())
     return {'dataset': (train, test), 'model': model, 'optimizer': optimizer, 
             'criterion': criterion, 'funcs': (step, compute_loss)}

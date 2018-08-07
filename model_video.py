@@ -42,7 +42,7 @@ class VPN(nn.Module):
         self.state = self.encode(x, self.state)
         x = self.decode(x, self.state)
         return x
-    
+
 class ResPixelNet(VPN):
     """Uses a simple stacked residual layer architecture with dilation for the
     encoding. Pixel is used for decoding.
@@ -75,6 +75,28 @@ class ResPixelNet(VPN):
     
     def decode(self, x, state):
         f0, f1, _ = x
+        return self.pix((f1, state))
+
+class GatePixelNet(VPN):
+    """Uses a simple stacked residual layer architecture with dilation for the
+    encoding, conditioned on the image. Pixel is used for decoding.
+    """
+    def __init__(self, f_ch, f_shape, x_ch, x_shape, state_ch,
+                 gtn_max_dil = 4, pix_depth = 10, pix_mix = 10):
+        super().__init__(state_ch, f_shape)
+        self.gtn = mt.GatedTransitionNet(f_ch + state_ch, f_shape, x_ch,
+                                         x_shape, state_ch, 
+                                         max_dil = gtn_max_dil)
+        self.pix = mp.PixelCNN(f_ch, f_shape, state_ch, 
+                               depth = pix_depth, num_mix = pix_mix)
+        
+    def encode(self, x, state):
+        f0, f1, img = x
+        past_f = f.concat(f0, state)
+        return self.gtn((past_f, img))
+    
+    def decode(self, x, state):
+        f0, f1, img = x
         return self.pix((f1, state))
 
 class WeightPixelNet(VPN):

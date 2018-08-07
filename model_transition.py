@@ -10,6 +10,7 @@ import model_blocks as b
 Implements models that take in two inputs, one of which evolves over time and
 the other of which predicts how the first evolves over time.
 """
+
 class TransitionNet(nn.Module):
     """Defines a general architecture where static data is encoded and
     this code is used in a transition step on dynamic data.
@@ -27,6 +28,124 @@ class TransitionNet(nn.Module):
         x_i, x_w = x
         code = self.encode(x_w)
         return self.transition(x_i, code)
+
+class GatedTransitionNet(TransitionNet):
+    def __init__(self, f_ch, f_shape, x_ch, x_shape, out_ch, 
+                 max_dil = 4):
+        """
+        f: frame and state concatenated
+        x: static img
+        out_ch: channels in the state
+        
+        takes in f and static img, outputs state.
+        """
+        super().__init__()
+        f_shape, x_shape = np.array(f_shape), np.array(x_shape)
+        
+        def should_downsample(current, target):
+            current = current // 2
+            return [(c >= t) for c, t in zip(current, target)]
+        
+        def non_negative(arr):
+            for i, n in enumerate(arr):
+                if n <= 0:
+                    arr[i] = 2
+            return arr
+        
+        en_ch = 16
+        modules = [b.Block_7x7(x_ch, en_ch, x_shape)]
+        ch, shape = en_ch, x_shape
+        status = should_downsample(shape, f_shape)
+        while True in status:
+            axes = np.where(np.array(status).astype(int) == 1)[0]
+            modules.append(b.StrideBlock(ch, shape, 'down', axes = axes))
+            ch = ch * 2
+            shape = f.halve(shape, axes)
+            status = should_downsample(shape, f_shape)
+        diff = shape.astype(int) - np.array(f_shape) + 1
+        diff = f.int_tuple(non_negative(diff))
+        modules.append(b.conv_padded(ch, ch, shape, f_shape, diff))
+        code_ch = ch
+        self.encode_modules = b.MultiModule(modules)
+        
+        nn_ch = 16
+        blocks_per = 2
+        self.pre = b.Block_7x7(f_ch, nn_ch, f_shape)
+        modules = []
+        for i in range(max_dil):
+            dil = i + 1
+            for _ in range(blocks_per):
+                modules.append(GatedResBlock(nn_ch, f_shape, code_ch, 3, 
+                                             dil = dil))
+                modules.append(GatedResBlock(nn_ch, f_shape, code_ch, 3, 
+                                             dil = dil))
+        for i in range(max_dil):
+            dil = max_dil - i
+            for _ in range(blocks_per):
+                modules.append(GatedResBlock(nn_ch, f_shape, code_ch, 3, 
+                                             dil = dil))
+                modules.append(GatedResBlock(nn_ch, f_shape, code_ch, 3, 
+                                             dil = dil))
+        self.mid = b.MultiModule(modules)
+        self.post = b.Block_7x7(nn_ch, out_ch, f_shape)
+    
+    def encode(self, x):
+        return self.encode_modules(x) # code is now B x C x kH x kW x kD
+    
+    def transition(self, x, code):
+        x = self.pre(x)
+        x, code = self.mid((x, code))
+        x = self.post(x)
+        return x
+
+class Gate(nn.Module):
+    """Implements the conditional gated activation function in PixelCNN but
+    without channel halving.
+    """
+    def __init__(self, ch, shape, cond_ch):
+        super().__init__()
+        self.conv_forget = b.conv_padded(cond_ch, ch, shape, shape, 1)
+        self.conv_gate = b.conv_padded(cond_ch, ch, shape, shape, 1)
+    
+    def forward(self, x):
+        """x should have even # of channels."""
+        x, cond = x
+        x1 = x + self.conv_forget(cond)
+        x2 = x + self.conv_gate(cond)
+        return F.tanh(x1) * F.sigmoid(x2)
+
+class GatedBlock(nn.Module):
+    """Implements a conv-BN-Gate block."""
+    def __init__(self, ch, shape, cond_ch, kernel, dil = 1):
+        super().__init__()
+        self.module = b.MultiModule((
+                b.conv_padded(ch, ch, shape, shape, kernel, dil = dil),
+                b.batch(ch, shape)))
+        self.gate = Gate(ch, shape, cond_ch)
+    
+    def forward(self, x):
+        x, cond = x
+        x = self.module(x)
+        x = self.gate(x, cond)
+        return x, cond
+    
+class GatedResBlock(nn.Module):
+    """Implements the residual block:
+    (http://torch.ch/blog/2016/02/04/resnets.html)
+    but with Gated activation.
+    """
+    def __init__(self, ch, shape, cond_ch, kernel, dil = 1):
+        super().__init__()
+        self.gated_conv = GatedBlock(ch, shape, cond_ch, kernel, dil = dil)
+        self.module = b.MultiModule(( 
+                b.conv_padded(ch, ch, shape, shape, kernel, dil = dil), 
+                b.batch(ch, shape)))
+    
+    def forward(self, x):
+        x_init, _ = x
+        x, cond = self.gated_conv(x)
+        x = x_init + self.module(x)
+        return x, cond
 
 class WeightTransitionNet(TransitionNet):
     """Uses structural information to predict the transitions of resting state
