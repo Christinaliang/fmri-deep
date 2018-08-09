@@ -31,11 +31,15 @@ class VPN(nn.Module):
             self.state = self.state.cuda()
             
     def encode(self, x, state):
-        """Encode input and current state into new state"""
+        """Encode input and current state into new state
+        channels: x_ch, ch + state_ch -> state_ch
+        """
         raise NotImplementedError
         
     def decode(self, x, state):
-        """Decode input and current state into output"""
+        """Decode input and current state into output
+        channels: x_ch, state_ch -> ch
+        """
         raise NotImplementedError
         
     def forward(self, x):
@@ -48,7 +52,7 @@ class ResPixelNet(VPN):
     encoding. Pixel is used for decoding.
     """
     def __init__(self, ch, shape, state_ch,
-                 max_dil = 4, pix_depth = 10, pix_mix = 10):
+                 max_dil = 3, pix_depth = 8, pix_mix = 8):
         super().__init__(state_ch, shape)
         nn_ch = 16
         blocks_per = 2
@@ -63,12 +67,13 @@ class ResPixelNet(VPN):
             for _ in range(blocks_per):
                 module_list.append(mb.ResBlock(nn_ch, shape, 3, dil = dil))
                 module_list.append(mb.ResBlock(nn_ch, shape, 3, dil = dil))
-        module_list.append(mb.Block_7x7(nn_ch, ch + state_ch, shape))
+        module_list.append(mb.Block_7x7(nn_ch, state_ch, shape))
         self.drn = mb.MultiModule(module_list)
         self.pix = mp.PixelCNN(ch, shape, state_ch, 
                                depth = pix_depth, num_mix = pix_mix)
         
     def encode(self, x, state):
+        """No static information provided"""
         f0, f1, _ = x
         past_f = f.concat(f0, state)
         return self.drn(past_f)
@@ -82,7 +87,7 @@ class GatePixelNet(VPN):
     encoding, conditioned on the image. Pixel is used for decoding.
     """
     def __init__(self, f_ch, f_shape, x_ch, x_shape, state_ch,
-                 gtn_max_dil = 4, pix_depth = 10, pix_mix = 10):
+                 gtn_max_dil = 3, pix_depth = 8, pix_mix = 8):
         super().__init__(state_ch, f_shape)
         self.gtn = mt.GatedTransitionNet(f_ch + state_ch, f_shape, x_ch,
                                          x_shape, state_ch, 

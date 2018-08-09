@@ -112,7 +112,7 @@ class Gate(nn.Module):
         x, cond = x
         x1 = x + self.conv_forget(cond)
         x2 = x + self.conv_gate(cond)
-        return F.tanh(x1) * F.sigmoid(x2)
+        return torch.tanh(x1) * torch.sigmoid(x2)
 
 class GatedBlock(nn.Module):
     """Implements a conv-BN-Gate block."""
@@ -126,7 +126,7 @@ class GatedBlock(nn.Module):
     def forward(self, x):
         x, cond = x
         x = self.module(x)
-        x = self.gate(x, cond)
+        x = self.gate((x, cond))
         return x, cond
     
 class GatedResBlock(nn.Module):

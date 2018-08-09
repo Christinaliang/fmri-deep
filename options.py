@@ -51,7 +51,7 @@ def step_pixel_recur(reset_every_t):
         avg_loss = 0.0
         model.init_hidden_state() # subjects don't share states
         for t in range(label.shape[0] - 1):        
-            print(t)
+            # print(t)
             f_in = label[t].unsqueeze(0) # current frame
             f_out = label[t + 1].unsqueeze(0) # next frame
             
@@ -224,7 +224,7 @@ def load_options(name):
         optimizer = optim.Adam
         criterion = mp.logistic_mixture_loss
         
-        step, compute_loss = step_pixel_recur(8), compute_loss_pixel_recur
+        step, compute_loss = step_pixel_recur(5), compute_loss_pixel_recur
     if name == 'dti_rest_gate':
         tr_dti = tm.Transforms((tm.Transpose((3,0,1,2)), tm.Decimate()),
                                apply_to = 'image')
@@ -248,7 +248,7 @@ def load_options(name):
         optimizer = optim.Adam
         criterion = mp.logistic_mixture_loss
         
-        step, compute_loss = step_pixel_recur(8), compute_loss_pixel_recur
+        step, compute_loss = step_pixel_recur(2), compute_loss_pixel_recur
     optimizer = optimizer(model.parameters())
     return {'dataset': (train, test), 'model': model, 'optimizer': optimizer, 
             'criterion': criterion, 'funcs': (step, compute_loss)}

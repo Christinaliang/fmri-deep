@@ -110,7 +110,7 @@ class GateAct(nn.Module):
         if cond is not None:
             x1 = x1 + self.conv_forget(cond)
             x2 = x2 + self.conv_gate(cond)
-        return F.tanh(x1) * F.sigmoid(x2)
+        return torch.tanh(x1) * torch.sigmoid(x2)
 
 def log_sum_exp(x, axis = 1):
     """Numerically stable log_sum_exp implementation
@@ -145,9 +145,9 @@ def logistic_mixture_loss(output, label):
     log_scales = torch.clamp(output[:,2*num_mix:3*num_mix,:,:,:], 
                              min=-7.) # 1 x 5 x shape, clamped to [-7,)
     label = torch.round(label)
-    label = torch.cat((label, label, label, label, label), 1) # 1 x 5 x shape
-    cdf_plus = F.sigmoid(torch.exp(-log_scales) * (label - means + 0.5))
-    cdf_minus = F.sigmoid(torch.exp(-log_scales) * (label - means - 0.5))
+    label = torch.cat([label for _ in range(num_mix)], 1) # 1 x 5 x shape
+    cdf_plus = torch.sigmoid(torch.exp(-log_scales) * (label - means + 0.5))
+    cdf_minus = torch.sigmoid(torch.exp(-log_scales) * (label - means - 0.5))
     
     log_probs = torch.clamp(cdf_plus - cdf_minus, min=1e-12)
     log_probs_mix = log_probs + log_softmax(logit_probs) # 1 x 5 x shape
