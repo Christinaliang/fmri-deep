@@ -10,6 +10,7 @@ import model_autoenc as ma
 import model_transition as mt
 import model_pixel as mp
 import model_video as mv
+import model_causal as mc
 import transform as tm
 
 def step_vanilla(model, optimizer, criterion, image, label):
@@ -38,6 +39,25 @@ def step_time(model, optimizer, criterion, image, label):
         # use curr frame and static image to predict next frame
         output = model((frame_in, image))
         loss = criterion(output, frame_out)
+        loss.backward()
+        optimizer.step()
+        
+        avg_loss += ((loss.data.item() - avg_loss) / (t + 1))
+    return avg_loss
+
+def step_time_l1(model, optimizer, criterion, image, label):
+    image = Variable(image).unsqueeze(0) # batch dimension
+                    
+    # Do one time step at a time; time dimension should be first
+    avg_loss = 0.0
+    for t in range(label.shape[0] - 1):
+        frame_in = label[t].unsqueeze(0) # current frame
+        frame_out = label[t + 1].unsqueeze(0) # next frame
+        
+        optimizer.zero_grad()
+        # use curr frame and static image to predict next frame
+        output = model(frame_in)
+        loss = criterion(output, frame_out, model)
         loss.backward()
         optimizer.step()
         
@@ -131,8 +151,63 @@ def compute_loss_pixel_recur(dataset, criterion, model):
         avg += (avg_loss - avg) / (i + 1)
     return avg
 
+def no_test(d, c, m):
+    return 0
+
 def load_options(name):
     """Saves experiment options under names to load in train and test."""
+    if name == 'rest_conn_l1':
+        """Implement lambda grid search!"""
+        tr1 = tm.Transforms((tm.ChannelDim(), tm.Decimate(),
+                             tm.Transpose((4,0,1,2,3)),
+                             tm.ToTensor()), apply_to = 'label')
+        tr2 = tm.Transforms((tm.ToTensor(),), apply_to = 'image')
+        tr = mb.MultiModule((tr1, tr2))
+        train = d.SingleRestDataset('../data/train/NC01', tr)
+        test = []
+        model = mb.FC
+        optimizer = optim.Adam
+        l1 = 0.0001
+        mse = nn.MSELoss()
+        def loss_f(pred, act, net):
+            l1_loss = mc.l1reg(model)
+            error = mse(pred, act)
+            # print('l1:', l1_loss, l1*l1_loss, 'mse:', error)
+            return l1*l1_loss + error
+        criterion = loss_f
+        
+        example = train[0][1]
+        print(example.shape)
+        ch, shape = example.shape[1], np.array(example.shape[2:])
+        model = model(ch, shape, ch, shape)
+        
+        step, compute_loss = step_time_l1, no_test
+    if name == 'rest_conn_nol1':
+        """Implement lambda grid search!"""
+        tr1 = tm.Transforms((tm.ChannelDim(), tm.Decimate(),
+                             tm.Transpose((4,0,1,2,3)),
+                             tm.ToTensor()), apply_to = 'label')
+        tr2 = tm.Transforms((tm.ToTensor(),), apply_to = 'image')
+        tr = mb.MultiModule((tr1, tr2))
+        train = d.SingleRestDataset('../data/train/NC01', tr)
+        test = []
+        model = mb.FC
+        optimizer = optim.Adam
+        l1 = 0
+        mse = nn.MSELoss()
+        def loss_f(pred, act, net):
+            l1_loss = mc.l1reg(model)
+            error = mse(pred, act)
+            # print('l1:', l1_loss, l1*l1_loss, 'mse:', error)
+            return l1*l1_loss + error
+        criterion = loss_f
+        
+        example = train[0][1]
+        print(example.shape)
+        ch, shape = example.shape[1], np.array(example.shape[2:])
+        model = model(ch, shape, ch, shape)
+        
+        step, compute_loss = step_time_l1, no_test
     if name == 't2_vae':
         tr = tm.Transforms((tm.ChannelDim(), tm.Decimate(), tm.Normalize(), 
                             tm.ToTensor()))

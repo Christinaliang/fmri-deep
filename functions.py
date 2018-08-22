@@ -1,11 +1,25 @@
 import numpy as np
 from scipy.interpolate import interp2d
+from skimage.measure import regionprops
 import torch
 import sys
 
 """
 Defines general utility functions
 """
+def box(img, mask):
+    bbox = regionprops(mask.astype(int), cache = False)[0].bbox
+    return img[bbox_slice(bbox, len(img.shape))]
+
+def bbox_slice(bbox, length):
+    front, back = bbox[:len(bbox)//2], bbox[len(bbox)//2:]
+    slices = []
+    for i in range(len(front)):
+        slices.append(slice(front[i], back[i]))
+    for _ in range(length - len(front)):
+        slices.append(slice(None, None))
+    return slices
+
 def islist(arr):
     return type(arr) in (tuple, list, np.array)
 

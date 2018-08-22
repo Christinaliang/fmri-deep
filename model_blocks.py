@@ -21,13 +21,12 @@ class FC(nn.Module):
         in_shape = np.array(in_shape).astype(int)
         out_shape = np.array(out_shape).astype(int)
         
-        self.out_ch, self.out_shape = out_ch, out_shape
+        self.out_ch, self.out_shape = out_ch, f.int_tuple(out_shape)
         self.fc = nn.Linear(in_ch * f.size(in_shape), 
                             out_ch * f.size(out_shape))
         
     def forward(self, x):
         x = torch.reshape(x, (x.shape[0], -1))
-        print(x.shape)
         x = self.fc(x)
         x = torch.reshape(x, (x.shape[0], self.out_ch) + self.out_shape)
         return x

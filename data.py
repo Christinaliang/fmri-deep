@@ -6,6 +6,35 @@ from fnmatch import fnmatch
 from os import listdir
 from os.path import join, isdir
 
+import functions as f
+
+class SingleDataset:
+    """Loads a single example from a directory.
+    Mainly used for backprop applications rather than dl.
+    """
+    def __init__(self, folder, transform, read):
+        self.folder = folder
+        self.transform = transform
+        self.read = read
+        
+    def __len__(self):
+        return 10
+    
+    def __getitem__(self, i):
+        return self.load(self.folder)
+    
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+            
+    def load(self, filename):
+        example = self.read(filename)
+        example = self.transform(example)
+        return example
+    
+    def shuffle(self):
+        pass
+
 class SubjectDataset:
     """Loads data in the following form:
     SubjectDataset(train, t, r):
@@ -124,6 +153,16 @@ def read_file(match):
         image = nib.load(images[0]).get_data()
         return image
     return f
+
+def read_rest(folder):
+    img = read_file('rest_postproc.nii.gz')(folder)
+    mask = read_file('rest_mask.nii.gz')(folder)
+    return f.box(img, mask)
+
+def SingleRestDataset(folder, transform):
+    return SingleDataset(folder, transform, 
+                         read_image_label(lambda x: np.array([0, 1]), 
+                                          read_rest))
 
 def RestDataset(folder, transform):
     return SubjectDataset(folder, transform, 
