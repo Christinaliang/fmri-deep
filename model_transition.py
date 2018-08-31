@@ -48,7 +48,7 @@ class TransitionFC(Transition):
         return self.fc(x)
     
     def compute_loss(self, image, label):
-        if next(self.parameters()).is_cuda():
+        if next(self.parameters()).is_cuda:
             image, label = image.cuda(), label.cuda()
         output = self.forward(image)
         return self.loss_func(output, label) + self.l1 * l1reg(self)
@@ -65,7 +65,7 @@ def l1reg(model):
     for name, W in model.named_parameters():
         if not name.endswith('bias'):
             target = torch.zeros(W.shape)
-            if W.is_cuda():
+            if W.is_cuda:
                 target = target.cuda()
             reg += l1_f(W, target)
     return reg

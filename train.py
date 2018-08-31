@@ -10,11 +10,14 @@ from os.path import exists, join
 import sys
 import time
 
-def save(obj, file):
+def save_state(obj, file):
     state = obj.state_dict()
     cpu_state = {}
-    for key, val in state:
-        cpu_state[key] = val.cpu()
+    for key in state:
+        try:
+            cpu_state[key] = state[key].cpu()
+        except AttributeError:
+            cpu_state[key] = state[key]
     torch.save(cpu_state, file)
 
 def main():
@@ -96,8 +99,8 @@ def main():
             losses = np.vstack((losses, [train_loss, test_loss]))
         print('[%d] Train loss: %.3f, Test loss: %.3f, Time elapsed: %.3f'
               % (e + 1, train_loss, test_loss, time.time() - start))
-        save(model, join(save, 'model.pth'))
-        save(optimizer, join(save, 'optimizer.pth'))
+        save_state(model, join(save, 'model.pth'))
+        save_state(optimizer, join(save, 'optimizer.pth'))
         np.save(join(save, 'losses.npy'), losses)
     
     print('Finished %d epochs.' % (epochs))
