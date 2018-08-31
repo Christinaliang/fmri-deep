@@ -78,7 +78,7 @@ def main():
             
             step_loss = model.step(image, label, optimizer = optimizer)
             # Compute average so far
-            train_loss += ((step_loss - train_loss) / (i % len(train) + 1))
+            train_loss += ((step_loss - train_loss) / (i + 1))
             
         # Test, log, and save once every epoch
         model.eval()
@@ -88,7 +88,7 @@ def main():
             label = Variable(label).unsqueeze(0)
             
             step_loss = model.step(image, label)
-            test_loss += ((step_loss - test_loss) / (i % len(test) + 1))
+            test_loss += ((step_loss - test_loss) / (i + 1))
             
         if losses is None:
             losses = np.array([train_loss, test_loss])
