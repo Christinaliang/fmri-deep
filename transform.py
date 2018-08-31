@@ -23,7 +23,7 @@ class Transforms(object):
         return (image, label)
 
 class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
+    """Convert array to Tensor."""
     def __call__(self, arr):
         return torch.from_numpy(arr.copy()).float()
 

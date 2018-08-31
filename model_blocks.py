@@ -56,6 +56,7 @@ class Block_7x7(nn.Module):
         return self.module(x)
 
 class Printer(nn.Module):
+    """Prints the shape of the input"""
     def __init__(self):
         super().__init__()
     

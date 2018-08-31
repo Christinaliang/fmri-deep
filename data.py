@@ -7,21 +7,20 @@ from os import listdir
 from os.path import join, isdir
 
 import functions as f
+import transform as t
 
-class SingleDataset:
-    """Loads a single example from a directory.
-    Mainly used for backprop applications rather than dl.
-    """
+class Dataset:
+    """Abstract class for loading examples from directory."""
     def __init__(self, folder, transform, read):
         self.folder = folder
         self.transform = transform
         self.read = read
         
     def __len__(self):
-        return 10
+        raise NotImplementedError
     
     def __getitem__(self, i):
-        return self.load(self.folder)
+        raise NotImplementedError
     
     def __iter__(self):
         for i in range(len(self)):
@@ -30,12 +29,25 @@ class SingleDataset:
     def load(self, filename):
         example = self.read(filename)
         example = self.transform(example)
-        return example
+        image, label = example
+        return (t.ToTensor()(image), t.ToTensor()(label))
     
     def shuffle(self):
         pass
 
-class SubjectDataset:
+class SingleDataset(Dataset):
+    """Loads a single example from a directory.
+    """
+    def __init__(self, folder, transform, read):
+        super().__init__(folder, transform, read)
+        
+    def __len__(self):
+        return 1
+    
+    def __getitem__(self, i):
+        return self.load(self.folder)
+
+class SubjectDataset(Dataset):
     """Loads data in the following form:
     SubjectDataset(train, t, r):
     train >
@@ -45,26 +57,15 @@ class SubjectDataset:
         ...
     """
     def __init__(self, folder, transform, read):
-        self.folder = folder
+        super().__init__(folder, transform, read)
         self.subjects = [join(folder, s) for s in listdir(folder) if 
                          isdir(join(folder, s))]
-        self.transform = transform
-        self.read = read
         
     def __len__(self):
         return len(self.subjects)
     
     def __getitem__(self, i):
         return self.load(self.subjects[i])
-    
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
-        
-    def load(self, filename):
-        example = self.read(filename) # tuple (image, label)
-        example = self.transform(example)
-        return example
     
     def shuffle(self):
         random.shuffle(self.subjects)
@@ -90,6 +91,10 @@ class Split:
             self.i = i
             self.example = self.dataset[self.i]
         return self.pick(d)
+    
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
     
     def __pick__(self, d):
         x, y = self.example
@@ -163,18 +168,3 @@ def SingleRestDataset(folder, transform):
     return SingleDataset(folder, transform, 
                          read_image_label(lambda x: np.array([0, 1]), 
                                           read_rest))
-
-def RestDataset(folder, transform):
-    return SubjectDataset(folder, transform, 
-                          read_image_label(lambda x: np.array([0, 1]), 
-                                           read_file('*mcf_brain.nii.gz')))
-
-def DTIRestDataset(folder, transform):
-    return SubjectDataset(folder, transform, 
-                read_image_label(read_file('*tensor.nii.gz'), 
-                                 read_file('*mcf_brain.nii.gz')))
-
-def T2AutoencDataset(folder, transform):
-    return SubjectDataset(folder, transform, 
-                read_image_label(read_file('*T2*brain.nii.gz'), 
-                                 read_file('*T2*brain.nii.gz')))
