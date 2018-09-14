@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 import model_blocks as mb
+import functions as f
 
 class Transition(nn.Module):
     """Defines a general architecture that takes in time data and computes 
@@ -10,6 +11,7 @@ class Transition(nn.Module):
     """
     def __init__(self):
         super().__init__()
+        self.criterion = nn.MSELoss()
         
     def forward(self, x):
         raise NotImplementedError
@@ -32,26 +34,67 @@ class Transition(nn.Module):
             avg_loss += ((loss.data.item() - avg_loss) / (t + 1))
         return avg_loss
     
-    def compute_loss(self, image, label):
-        raise NotImplementedError
-
-class TransitionFC(Transition):
-    """Predicts transition via fully connected layer without activation.
-    """
-    def __init__(self, in_ch, in_shape, out_ch, out_shape, l1 = 0):
-        super().__init__()
-        self.fc = mb.FC(in_ch, in_shape, out_ch, out_shape)
-        self.l1 = l1 # lambda value for l1 regularization on FC matrix
-        self.loss_func = nn.MSELoss()
-    
-    def forward(self, x):
-        return self.fc(x)
+    def simulate(self, frame_0, time):
+        frame = frame_0.unsqueeze(0)
+        video = frame.detach()
+        for t in range(time):
+            frame = self.forward(frame).detach()
+            video = np.concatenate((video, frame), axis = 0)
+        return video
     
     def compute_loss(self, image, label):
         if next(self.parameters()).is_cuda:
             image, label = image.cuda(), label.cuda()
         output = self.forward(image)
-        return self.loss_func(output, label) + self.l1 * l1reg(self)
+        return self.loss_func(output, label)
+    
+    def loss_func(self, output, label):
+        return self.criterion(output, label)
+
+class MarkovLinear(nn.Linear):
+    """Linear layer except the columns sum to one (models a Markov chain).
+    Must be called with bias = False for it to make sense.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.register_buffer('mask', self.weight.data.clone())
+        print(self.weight.data.shape)
+        self.mask.fill_(1)
+        self.mask = self.mask - torch.eye(self.weight.data.shape[0])
+        
+    def forward(self, x):
+        self.weight.data *= self.mask
+        # weight is out_features x in_features
+        # everything out of something should sum to 1
+        col_totals = torch.sum(self.weight.data, 0)
+        diag = torch.ones(col_totals.shape) - col_totals
+        return super().forward(x) + diag * x
+
+class TransitionMarkov(Transition):
+    def __init__(self, ch, shape):
+        super().__init__()
+        self.ch = ch
+        self.shape = shape
+        size = f.size(shape) * ch
+        self.markov = MarkovLinear(size, size, bias = False)
+        
+    def forward(self, x):
+        return self.markov(x)
+
+class TransitionFC(Transition):
+    """Predicts transition via fully connected layer without activation.
+    """
+    def __init__(self, ch, shape, l1 = 0):
+        super().__init__()
+        self.fc = mb.FC(ch, shape, ch, shape)
+        self.l1 = l1 # lambda value for l1 regularization on FC matrix
+    
+    def forward(self, x):
+        return self.fc(x)
+    
+    def loss_func(self, output, label):
+        reg = self.l1 * l1reg(self)
+        return super().loss_func(output, label) + reg
 
 def l1reg(model):
     """Computes the L1 norm of the weights of the model.

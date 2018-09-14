@@ -18,6 +18,5 @@ def load_options(name):
         
         example = train[0][1]
         ch, shape = example.shape[1], np.array(example.shape[2:])
-        model = model(ch, shape, ch, shape)
-    optimizer = optimizer(model.parameters())
+        model = model(ch, shape)
     return {'dataset': (train, test), 'model': model, 'optimizer': optimizer}

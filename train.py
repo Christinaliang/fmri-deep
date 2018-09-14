@@ -56,12 +56,14 @@ def main():
     elif load:
         print('Loading model:', name)
         model.load_state_dict(torch.load(join(save, 'model.pth')))
-        optimizer.load_state_dict(torch.load(join(save, 'optimizer.pth')))
         losses = np.load(join(save, 'losses.npy'))
     if device is not None:
         torch.cuda.set_device(device)
         model.cuda()
-        
+    optimizer = optimizer(model.parameters()) # need to construct after cuda
+    if load:
+        optimizer.load_state_dict(torch.load(join(save, 'optimizer.pth')))
+    
     # Train the model
     print('Beginning training...')
     print('Name:', name)
