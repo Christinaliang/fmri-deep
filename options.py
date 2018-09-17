@@ -14,7 +14,7 @@ def load_options(name):
         train = d.SingleRestDataset('../data/train/NC01', tr)
         test = [] # no test set
         model = mt.TransitionMarkov
-        optimizer = optim.Adam
+        optimizer = optim.Rprop
         
         example = train[0][1]
         ch, shape = example.shape[1], np.array(example.shape[2:])
@@ -24,7 +24,7 @@ def load_options(name):
                            t.Transpose((2,0,1))), apply_to = 'label')
         train = d.RestVectorDataset('../data/train/NC01', tr)
         test = [] # no test set
-        model = mt.TransitionMarkov
+        model = mt.TransitionFC
         optimizer = optim.Adam
         
         example = train[0][1]
