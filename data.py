@@ -168,3 +168,8 @@ def SingleRestDataset(folder, transform):
     return SingleDataset(folder, transform, 
                          read_image_label(lambda x: np.array([0, 1]), 
                                           read_rest))
+    
+def RestVectorDataset(folder, transform):
+    return SingleDataset(folder, transform, 
+                         read_image_label(lambda x: np.array([0, 1]), 
+                                          read_file('rest_atlas_vec.nii.gz')))

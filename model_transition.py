@@ -74,12 +74,15 @@ class TransitionMarkov(Transition):
     def __init__(self, ch, shape):
         super().__init__()
         self.ch = ch
-        self.shape = shape
+        self.shape = f.int_tuple(shape)
         size = f.size(shape) * ch
         self.markov = MarkovLinear(size, size, bias = False)
         
     def forward(self, x):
-        return self.markov(x)
+        x = torch.reshape(x, (x.shape[0], -1))
+        x = self.markov(x)
+        x = torch.reshape(x, (x.shape[0], self.ch) + self.shape)
+        return x
 
 class TransitionFC(Transition):
     """Predicts transition via fully connected layer without activation.
