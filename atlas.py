@@ -3,13 +3,13 @@ import numpy as np
 
 import sys
 
-def atlas_sum(atlas, img):
+def atlas_sum(atlas, img, mask):
     """Takes in registered image and atlas and combines pixels in each atlas
     region. Both should be same resolution and shape.
     image should not be detrended! detrend after.
     """
     num_regions = np.max(atlas) + 1 # do this before masking!
-    mask = img[:,:,:,0] != 0
+    # mask = img[:,:,:,0] != 0 # not necessarily a correct mask
     atlas *= mask
     summed = None
     for i in range(num_regions):
@@ -44,21 +44,22 @@ def save_nii(name, img, affine = None):
     nib.save(image, name)
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         print('Arguments:')
         print('1: file path to atlas')
         print('2: file path to img')
+        print('3: file path to mask')
         print('Example:')
-        print('python atlas.py atlas.nii.gz img.nii.gz')
+        print('python atlas.py atlas.nii.gz img.nii.gz mask.nii.gz')
         return
     atlas = nib.load(sys.argv[1])
     affine = atlas.affine
     atlas = atlas.get_data()
     img = nib.load(sys.argv[2]).get_data()
-    summed = atlas_sum(atlas, img)
-    print(summed.shape)
+    mask = nib.load(sys.argv[3]).get_data()
+    summed = atlas_sum(atlas, img, mask)
+    print('(atlas regions, time points):', summed.shape)
     img_summed = sum_to_volume(atlas, summed)
-    print(img_summed.shape)
     save_nii('rest_atlas_vec.nii.gz', summed)
     save_nii('rest_atlas_img.nii.gz', img_summed, affine = affine)
     
