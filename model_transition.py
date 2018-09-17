@@ -67,7 +67,10 @@ class MarkovLinear(nn.Linear):
         # weight is out_features x in_features
         # everything out of something should sum to 1
         col_totals = torch.sum(self.weight.data, 0)
-        diag = torch.ones(col_totals.shape) - col_totals
+        ones = torch.ones(col_totals.shape)
+        if x.is_cuda:
+            ones = ones.cuda()
+        diag = ones - col_totals
         return super().forward(x) + diag * x
 
 class TransitionMarkov(Transition):
