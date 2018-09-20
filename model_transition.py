@@ -42,6 +42,14 @@ class Transition(nn.Module):
             video = np.concatenate((video, frame), axis = 0)
         return video
     
+    def simulate_step(self, frames):
+        video = frames[0].unsqueeze(0).detach()
+        for t in range(frames.shape[0] - 1):
+            frame_in = frames[t].unsqueeze(0)
+            frame = self.forward(frame_in).detach()
+            video = np.concatenate((video, frame), axis = 0)
+        return video
+    
     def compute_loss(self, image, label):
         if next(self.parameters()).is_cuda:
             image, label = image.cuda(), label.cuda()
