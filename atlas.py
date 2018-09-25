@@ -54,7 +54,7 @@ def main():
         return
     atlas = nib.load(sys.argv[1])
     affine = atlas.affine
-    atlas = atlas.get_data()
+    atlas = atlas.get_data().astype(int)
     img = nib.load(sys.argv[2]).get_data()
     mask = nib.load(sys.argv[3]).get_data()
     summed = atlas_sum(atlas, img, mask)
