@@ -14,7 +14,8 @@ def atlas_sum(atlas, img, mask):
     summed = None
     for i in range(num_regions):
         time_series = img[np.where(atlas == i)] # pixels x time_pts
-        sum_series = np.sum(time_series, axis = 0)
+        sum_series = (np.sum(time_series, axis = 0) / 
+                      max(1, time_series.shape[0]))
         if summed is None:
             summed = sum_series
         else:
@@ -34,7 +35,7 @@ def sum_to_volume(atlas, summed):
         for t in range(time_pts):
             idx = np.where(atlas == i)
             idx = idx + tuple((np.zeros((1, idx[0].size)) + t).astype(int))
-            img[idx] = summed[i, t] / max(1, idx[0].size)
+            img[idx] = summed[i, t] # / max(1, idx[0].size)
     return img
 
 def save_nii(name, img, affine = None):
@@ -44,24 +45,26 @@ def save_nii(name, img, affine = None):
     nib.save(image, name)
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print('Arguments:')
         print('1: file path to atlas')
         print('2: file path to img')
         print('3: file path to mask')
+        print('4: suffix of saved image')
         print('Example:')
-        print('python atlas.py atlas.nii.gz img.nii.gz mask.nii.gz')
+        print('python atlas.py atlas.nii.gz img.nii.gz mask.nii.gz 400')
         return
     atlas = nib.load(sys.argv[1])
     affine = atlas.affine
     atlas = atlas.get_data().astype(int)
     img = nib.load(sys.argv[2]).get_data()
     mask = nib.load(sys.argv[3]).get_data()
+    suffix = sys.argv[4]
     summed = atlas_sum(atlas, img, mask)
     print('(atlas regions, time points):', summed.shape)
-    img_summed = sum_to_volume(atlas, summed)
-    save_nii('rest_atlas_vec.nii.gz', summed)
-    save_nii('rest_atlas_img.nii.gz', img_summed, affine = affine)
+    img_sum = sum_to_volume(atlas, summed)
+    save_nii('rest_atlas_vec' + suffix + '.nii.gz', summed)
+    save_nii('rest_atlas_img' + suffix + '.nii.gz', img_sum, affine = affine)
     
 if __name__ == '__main__':
     main()
