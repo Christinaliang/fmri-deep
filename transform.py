@@ -27,6 +27,21 @@ class ToTensor(object):
     def __call__(self, arr):
         return torch.from_numpy(arr.copy()).float()
 
+class Reorder(object):
+    """Reorders a dimension of the data according to indices"""
+    def __init__(self, axis, ordering):
+        self.axis = axis
+        self.ordering = ordering
+    
+    def __call__(self, arr):
+        slices = []
+        for dim in range(arr.ndim):
+            if dim != self.axis:
+                slices.append(None)
+            else:
+                slices.append(self.ordering)
+        return arr[np.index_exp[tuple(slices)]]
+
 class Normalize(object):
     """Normalizes the data"""
     def __call__(self, arr):
