@@ -3,7 +3,7 @@ import torch.nn as nn
 
 import model_blocks as b
 
-class PixelCNN(nn.Module):
+class PixelCNN(b.Forward):
     """Stacks Pixel2d blocks together to take in an image and fit a logistic 
     mixture model.
     No dilations for now due to the assumption that temporal and physical
@@ -26,7 +26,10 @@ class PixelCNN(nn.Module):
     def forward(self, x):
         h, v = self.module((x, x))
         return h
-
+    
+    def loss(self, output, label):
+        return logistic_mixture_loss(output, label)
+        
 class Pixel2d(nn.Module):
     """Implements the PixelCNN block (https://arxiv.org/abs/1606.05328).
     first: determines whether to mask middle pixel or not
@@ -69,8 +72,8 @@ class GateAct(nn.Module):
     
     def forward(self, x):
         """x should have an even # of channels."""
-        _, C, _, _, _ = x.shape
-        x1, x2 = x[:,:(C//2),:,:,:], x[:,(C//2):,:,:,:]
+        C = x.shape[1]
+        x1, x2 = x[:,:(C//2)], x[:,(C//2):]
         return torch.tanh(x1) * torch.sigmoid(x2)
 
 def log_sum_exp(x, axis = 0):

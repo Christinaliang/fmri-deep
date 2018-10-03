@@ -5,14 +5,43 @@ import torch.nn as nn
 import functions as f
 
 """
-The model modules 3 layers of abstraction: the operations themselves (ex: 
+3 layers of abstraction: the operations themselves (ex: 
 conv_padded, FC), blocks that combine operations (ex: ResBlock, UBlock), and
-the full models that combine blocks (found in model_autoenc and others).
+the full models that combine blocks.
 
 Notes:
     shapes should be np.arrays of floats for nice down and upsampling:
         7.0 -> 3.5 -> 7.0 vs 7 -> 3 -> 6
 """
+
+class Forward(nn.Module):
+    """Defines a general architecture that takes in an image and computes a
+    label directly.
+    """
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, x):
+        raise NotImplementedError
+            
+    def step(self, image, label, optimizer = None):
+        if self.training:
+            optimizer.zero_grad()
+            loss = self.compute_loss(image, label)
+            loss.backward()
+            optimizer.step()
+        else:
+            loss = self.compute_loss(image, label)
+        return loss
+    
+    def compute_loss(self, image, label):
+        if next(self.parameters()).is_cuda:
+            image, label = image.cuda(), label.cuda()
+        output = self.forward(image)
+        return self.loss(output, label)
+    
+    def loss(self, output, label):
+        raise NotImplementedError
 
 class FC(nn.Module):
     """Implements a fully connected layer that reshapes before and after."""
@@ -157,7 +186,7 @@ def conv_padded(ch_in, ch_out, d_in, d_out, kernel,
             convf = convf[1]
     p = f.padding(d_in, d_out, kernel, stride)
     print(ch_in, d_in, ch_out, d_out)
-    # print('pad:', p, 'kernel:', kernel, 'stride:', stride)
+    print('pad:', p, 'kernel:', kernel, 'stride:', stride)
     conv = convf(ch_in, ch_out, kernel, stride = stride)
     pad = pad_f(p, 0)
     return MultiModule([pad, conv])

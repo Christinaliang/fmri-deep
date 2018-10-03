@@ -37,7 +37,7 @@ class Reorder(object):
         slices = []
         for dim in range(arr.ndim):
             if dim != self.axis:
-                slices.append(None)
+                slices.append(slice(None, None, None))
             else:
                 slices.append(self.ordering)
         return arr[np.index_exp[tuple(slices)]]
