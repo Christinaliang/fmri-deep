@@ -31,7 +31,8 @@ class Forward(nn.Module):
             loss.backward()
             optimizer.step()
         else:
-            loss = self.compute_loss(image, label)
+            with torch.no_grad():
+                loss = self.compute_loss(image, label)
         return loss
     
     def compute_loss(self, image, label):
@@ -186,7 +187,7 @@ def conv_padded(ch_in, ch_out, d_in, d_out, kernel,
             convf = convf[1]
     p = f.padding(d_in, d_out, kernel, stride)
     print(ch_in, d_in, ch_out, d_out)
-    print('pad:', p, 'kernel:', kernel, 'stride:', stride)
+    # print('pad:', p, 'kernel:', kernel, 'stride:', stride)
     conv = convf(ch_in, ch_out, kernel, stride = stride)
     pad = pad_f(p, 0)
     return MultiModule([pad, conv])

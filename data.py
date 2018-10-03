@@ -52,6 +52,7 @@ class SubjectDataset(Dataset):
         return len(self.subjects)
     
     def __getitem__(self, i):
+        # print(self.subjects[i])
         return self.load(self.subjects[i])
     
     def shuffle(self):

@@ -14,7 +14,7 @@ class PixelCNN(b.Forward):
     Output channels: log_prob, mean, and log_scale for each logistic (3 * nmix)
     """
     def __init__(self, ch, shape,
-                 kernel = 3, depth = 20, nmix = 5):
+                 kernel = 3, depth = 20, nmix = 10):
         super().__init__()
         nn_ch = 16 # number of internal channels
         modules = [Pixel2d(nn_ch, shape, kernel, first = True, in_ch = ch)]
