@@ -3,6 +3,8 @@ from scipy.signal import decimate
 from scipy.ndimage import zoom
 import torch
 
+import functions as f
+
 class Transforms(object):
     """Composes one-argument transforms. Does not work for two-argument
     transforms like Residual."""
@@ -26,6 +28,14 @@ class ToTensor(object):
     """Convert array to Tensor."""
     def __call__(self, arr):
         return torch.from_numpy(arr.copy()).float()
+
+class Softmax(object):
+    """Applies softmax to given dimension."""
+    def __init__(self, axis):
+        self.axis = axis
+        
+    def __call__(self, arr):
+        return f.softmax(arr, self.axis)
 
 class Reorder(object):
     """Reorders a dimension of the data according to indices"""

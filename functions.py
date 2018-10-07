@@ -7,6 +7,15 @@ import sys
 """
 Defines general utility functions
 """
+def softmax(X, axis):
+    y = np.atleast_2d(X)
+    y = y - np.expand_dims(np.max(y, axis = axis), axis)
+    y = np.exp(y)
+    ax_sum = np.expand_dims(np.sum(y, axis = axis), axis)
+    p = y / ax_sum
+    if len(X.shape) == 1: p = p.flatten()
+    return p
+
 def cycle_axes(tensor):
     axes = np.arange(len(tensor.shape))
     axes = np.roll(axes, 1)

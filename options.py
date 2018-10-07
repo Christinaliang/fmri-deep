@@ -3,6 +3,7 @@ import torch.optim as optim
 
 import data as d
 import model_pixel as mp
+import model_mc as mc
 import transform as t
 
 def load_options(name):
@@ -13,7 +14,7 @@ def load_options(name):
         tr = t.Transforms((t.Reorder(0, slice(1, None, None)), 
                            t.Reorder(0, idx),
                            t.ChannelDim()))
-        # (img, lbl) is (1 x 1 x 400 x 200, 1 x 1 x 400 x 200)
+        # (img, lbl) is (1 x 1 x 400 x 200, 1 x 1 x 400 x 200) after batch
         train = d.RestAtlasDataset('../data/train', tr)
         test = d.RestAtlasDataset('../data/test', tr)
         model = mp.PixelCNN
@@ -24,7 +25,6 @@ def load_options(name):
         tr = t.Transforms((t.Reorder(0, slice(1, None, None)), 
                            t.Reorder(0, idx),
                            t.ChannelDim()))
-        # (img, lbl) is (1 x 1 x 400 x 200, 1 x 1 x 400 x 200)
         train = d.RestAtlasDataset('../data/train', tr)
         test = d.RestAtlasDataset('../data/test', tr)
         model = lambda ch, shape: mp.PixelCNN(ch, shape, depth = 30)
@@ -35,10 +35,22 @@ def load_options(name):
         tr = t.Transforms((t.Reorder(0, slice(1, None, None)), 
                            t.Reorder(0, idx),
                            t.ChannelDim()))
-        # (img, lbl) is (1 x 1 x 400 x 200, 1 x 1 x 400 x 200)
         train = d.RestAtlasDataset('../data/train', tr)
         test = d.RestAtlasDataset('../data/test', tr)
         model = lambda ch, shape: mp.PixelCNN(ch, shape, kernel = 5)
+        optimizer = optim.Adam
+    if name == 'markov_atlas':
+        """
+        Transforms:
+        Reorder: gets rid of first atlas location (400)
+        Softmax: apply softmax across atlas regions
+        """
+        tr = t.Transforms((t.Reorder(0, slice(1, None, None)),
+                           t.Softmax(0),
+                           t.ChannelDim()))
+        train = d.RestAtlasDataset('../data/train', tr)
+        test = d.RestAtlasDataset('../data/test', tr)
+        model = mc.MarkovChain
         optimizer = optim.Adam
     example = train[0][0]
     ch, shape = example.shape[0], np.array(example.shape[1:])
