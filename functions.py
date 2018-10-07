@@ -7,6 +7,11 @@ import sys
 """
 Defines general utility functions
 """
+def cycle_axes(tensor):
+    axes = np.arange(len(tensor.shape))
+    axes = np.roll(axes, 1)
+    return tensor.permute(int_tuple(axes))
+
 def box(img, mask):
     bbox = regionprops(mask.astype(int), cache = False)[0].bbox
     return img[bbox_slice(bbox, len(img.shape))]

@@ -27,19 +27,19 @@ class Forward(nn.Module):
     def step(self, image, label, optimizer = None):
         if self.training:
             optimizer.zero_grad()
-            loss = self.compute_loss(image, label)
+            output, loss = self.compute_loss(image, label)
             loss.backward()
             optimizer.step()
         else:
-            with torch.no_grad():
-                loss = self.compute_loss(image, label)
+            output, loss = self.compute_loss(image, label)
         return loss
     
     def compute_loss(self, image, label):
         if next(self.parameters()).is_cuda:
             image, label = image.cuda(), label.cuda()
-        output = self.forward(image)
-        return self.loss(output, label)
+        with torch.set_grad_enabled(self.training):
+            output = self.forward(image)
+        return output, self.loss(output, label)
     
     def loss(self, output, label):
         raise NotImplementedError

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import model_blocks as b
 
@@ -76,24 +77,6 @@ class GateAct(nn.Module):
         x1, x2 = x[:,:(C//2)], x[:,(C//2):]
         return torch.tanh(x1) * torch.sigmoid(x2)
 
-def log_sum_exp(x, axis = 0):
-    """Numerically stable log_sum_exp implementation
-    Calculates log(sum(e^{x_i})).
-    Axis should be the axis to sum over.
-    """
-    m, _  = torch.max(x, dim=axis)
-    m2, _ = torch.max(x, dim=axis, keepdim=True)
-    return m + torch.log(torch.sum(torch.exp(x - m2), dim=axis))
-
-def log_softmax(x, axis = 0):
-    """Numerically stable log_softmax implementation
-    Converts vector into log probabilities.
-    Axis should be the axis to convert.
-    """
-    m, _ = torch.max(x, dim=axis, keepdim=True)
-    return x - m - torch.log(torch.sum(torch.exp(x - m), 
-                                       dim=axis, keepdim=True))
-
 def logistic_mixture_loss(output, label):
     """
     label: 1 x 1 x 64 x 64 x 38
@@ -119,9 +102,9 @@ def logistic_mixture_loss(output, label):
     cdf_minus = torch.sigmoid(torch.exp(-log_scales) * (label - means - 0.5))
     
     log_probs = torch.clamp(cdf_plus - cdf_minus, min=1e-12)
-    log_probs_mix = log_probs + log_softmax(logit_probs)
-    log_probs_max = log_sum_exp(log_probs_mix)
-    return -torch.sum(log_probs_max)
+    log_probs += F.log_softmax(logit_probs, dim = 0)
+    log_probs = torch.logsumexp(log_probs, 0)
+    return -torch.sum(log_probs)
 
 class MaskedConv2d(nn.Conv2d):
     """Base class for causal convolutions. kernel size should be odd."""
