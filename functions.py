@@ -1,25 +1,23 @@
 import numpy as np
 from scipy.interpolate import interp2d
 from skimage.measure import regionprops
-import torch
 import sys
 
 """
 Defines general utility functions
 """
-def softmax(X, axis):
-    y = np.atleast_2d(X)
-    y = y - np.expand_dims(np.max(y, axis = axis), axis)
-    y = np.exp(y)
-    ax_sum = np.expand_dims(np.sum(y, axis = axis), axis)
-    p = y / ax_sum
-    if len(X.shape) == 1: p = p.flatten()
-    return p
+def norm_sum(x):
+    if np.sum(x) == 0:
+        return x
+    return x / np.sum(x)
 
-def cycle_axes(tensor):
-    axes = np.arange(len(tensor.shape))
+def norm_01(x):
+    return (x - np.min(x)) / (np.max(x) - np.min(x))
+
+def cycle_axes(arr):
+    axes = np.arange(len(arr.shape))
     axes = np.roll(axes, 1)
-    return tensor.permute(int_tuple(axes))
+    return arr.permute(int_tuple(axes))
 
 def box(img, mask):
     bbox = regionprops(mask.astype(int), cache = False)[0].bbox
@@ -112,13 +110,6 @@ def apply_padf(d_in, d_out, kernel, stride, pad_f):
         stride = [stride for _ in range(len(d_in))]
     return np.array([pad_f(i, o, k, s) for i, o, k, s in 
                      zip(d_in, d_out, kernel, stride)])
-        
-def concat(a, b):
-    """Concatenates a and b on the channel dimension.
-    
-    Assumes a and b are B x C x ....
-    """
-    return torch.cat((a, b), 1)
 
 def tile_add(x, y):
     """Adds x and y with necessary tiling in the channel dimension.

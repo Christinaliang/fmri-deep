@@ -29,13 +29,21 @@ class ToTensor(object):
     def __call__(self, arr):
         return torch.from_numpy(arr.copy()).float()
 
-class Softmax(object):
-    """Applies softmax to given dimension."""
+class NormalizeSum(object):
+    """Normalizes a given dimension to sum to 1."""
     def __init__(self, axis):
         self.axis = axis
         
     def __call__(self, arr):
-        return f.softmax(arr, self.axis)
+        return np.apply_along_axis(f.norm_sum, self.axis, arr)
+
+class Normalize01(object):
+    """Normalizes a given dimension to [0,1]."""
+    def __init__(self, axis):
+        self.axis = axis
+        
+    def __call__(self, arr):
+        return np.apply_along_axis(f.norm_01, self.axis, arr)
 
 class Reorder(object):
     """Reorders a dimension of the data according to indices"""

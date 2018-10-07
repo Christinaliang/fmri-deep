@@ -41,12 +41,14 @@ def load_options(name):
         optimizer = optim.Adam
     if name == 'markov_atlas':
         """
+        RestAtlasDataset pre-transformation: 401 x 200 (atlas x time)
+        post-transformation: 1 x 400 x 200
         Transforms:
         Reorder: gets rid of first atlas location (400)
-        Softmax: apply softmax across atlas regions
+        NormalizeSum: treat blood as distribution w/ fixed sum
         """
         tr = t.Transforms((t.Reorder(0, slice(1, None, None)),
-                           t.Softmax(0),
+                           t.NormalizeSum(0),
                            t.ChannelDim()))
         train = d.RestAtlasDataset('../data/train', tr)
         test = d.RestAtlasDataset('../data/test', tr)

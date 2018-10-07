@@ -19,11 +19,12 @@ class Transition(b.Forward):
         
     def forward(self, x):
         """x should be the full time series."""
-        x = x.cycle_axes(x)
+        x = f.cycle_axes(x)
         frame = x[0]
-        video = frame
+        video = frame.unsqueeze(-1) # add time dim back in order to cat
         for t in range(x.shape[0] - 1):
-            video = np.concatenate((video, self.next_frame(frame)), axis = 0)
+            frame = self.next_frame(frame) # batch x ch x shape
+            video = torch.cat((video, frame.unsqueeze(-1)), -1) # b x c x s x t
             if self.steps == 'single':
                 frame = x[t + 1]
         return video
@@ -40,10 +41,18 @@ class MarkovLinear(nn.Module):
     """
     def __init__(self, size):
         super().__init__()
-        self.register_buffer('weights', torch.ones((size,size)))
+        print('P: ({}, {})'.format(size, size))
+        self.weight = nn.Parameter(torch.Tensor(size, size))
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        stdv = 1. / np.sqrt(self.weight.shape[1])
+        self.weight.data.uniform_(-stdv, stdv)
         
     def forward(self, x):
-        return F.linear(x, F.softmax(self.weights, dim = 1))
+        P = F.softmax(self.weight, dim = 1)
+        R = F.linear(x, P)
+        return R
         
 class MarkovChain(Transition):
     """Treats input vector as distribution over states of a markov chain and
@@ -51,6 +60,7 @@ class MarkovChain(Transition):
     """
     def __init__(self, ch, shape):
         super().__init__()
+        shape = np.roll(shape, 1)[1:] # remove time axis from shape
         size = f.size(shape) * ch
         self.P = MarkovLinear(size)
         self.criterion = nn.KLDivLoss()
@@ -63,5 +73,6 @@ class MarkovChain(Transition):
     
     def loss(self, output, label):
         """Assumes output and label are probabilities, applies KL div."""
-        output = torch.log(output) # modify to make numerically stable?
+        output = torch.clamp(output, min=1e-6)
+        output = torch.log(output)
         return self.criterion(output, label)
