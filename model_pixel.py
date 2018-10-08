@@ -53,7 +53,7 @@ class PixelCNN(b.Forward):
                 out = self.forward(img_in)
                 # 1 x 3*num_mix x shape -> shape x 3*num_mix -> 3*num_mix
                 out = f.cycle_axes(out[0], -1)[f.int_tuple(idx)]
-                img[idx] = logistic_mixture_sample(out.detach().numpy())
+                img[idx] = logistic_mixture_sample(out.cpu().detach().numpy())
         return img
 
 class Pixel2d(nn.Module):
