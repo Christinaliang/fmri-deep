@@ -1,8 +1,11 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 import model_blocks as b
+import functions as f
 
 class PixelCNN(b.Forward):
     """Stacks Pixel2d blocks together to take in an image and fit a logistic 
@@ -24,6 +27,9 @@ class PixelCNN(b.Forward):
         modules.append(Pixel2d(3 * nmix, shape, kernel, in_ch = nn_ch))
         self.module = b.MultiModule(modules)
         
+        self.ch = ch
+        self.shape = shape
+        
     def forward(self, x):
         h, v = self.module((x, x))
         return h
@@ -31,6 +37,25 @@ class PixelCNN(b.Forward):
     def loss(self, output, label):
         return logistic_mixture_loss(output, label)
         
+    def sample(self):
+        """Only works for ch = 1"""
+        self.eval()
+        img = torch.zeros(f.int_tuple(self.shape))
+        if next(self.parameters()).is_cuda:
+            img = img.cuda()
+        with torch.no_grad():
+            # generate flattened list of indices
+            grid = np.indices(self.shape)
+            grid = grid.reshape(grid.shape[0], -1).transpose(1, 0)
+            for idx in grid: # iterate over arbitrary dimensional grid
+                # add batch and channel dim
+                img_in = Variable(img).unsqueeze(0).unsqueeze(0)
+                out = self.forward(img_in)
+                # 1 x 3*num_mix x shape -> shape x 3*num_mix -> 3*num_mix
+                out = f.cycle_axes(out[0], -1)[f.int_tuple(idx)]
+                img[idx] = logistic_mixture_sample(out.detach().numpy())
+        return img
+
 class Pixel2d(nn.Module):
     """Implements the PixelCNN block (https://arxiv.org/abs/1606.05328).
     first: determines whether to mask middle pixel or not
@@ -77,6 +102,22 @@ class GateAct(nn.Module):
         x1, x2 = x[:,:(C//2)], x[:,(C//2):]
         return torch.tanh(x1) * torch.sigmoid(x2)
 
+def logistic_mixture_sample(output):
+    """
+    output: 1-d numpy array of length 3 * num_mix
+    0: logit probs
+    1: means
+    2: log scales
+    """
+    nmix = output.shape[0] // 3
+    logit_probs = output[:nmix]
+    means = output[nmix:2*nmix]
+    log_scales = np.clip(output[2*nmix:3*nmix], -7., None) # -7 min, no max
+    
+    mixture = np.random.choice(np.arange(nmix), p = f.softmax(logit_probs))
+    mean, scale = means[mixture], np.exp(-log_scales[mixture])
+    return np.random.logistic(loc=mean, scale=scale)
+    
 def logistic_mixture_loss(output, label):
     """
     label: 1 x 1 x 64 x 64 x 38
@@ -88,7 +129,7 @@ def logistic_mixture_loss(output, label):
     returns log probability of pixels, summed over whole image.
     Only works for single channel data.
     """
-    nmix = int(output.shape[1] / 3)
+    nmix = output.shape[1] // 3
     
     # All of theese are (mixtures x shape)
     logit_probs = output[0,:nmix]
