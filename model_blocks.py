@@ -17,7 +17,7 @@ Notes:
 def print_gradsize(model):
     for name, param in model.named_parameters():
         if param.requires_grad and param.grad is not None:
-            ratio = np.abs((param.grad / param.data).detach().numpy())
+            ratio = np.abs((param.grad / param.data).cpu().detach().numpy())
             print(name, np.max(ratio), np.mean(ratio), np.min(ratio))
 
 class Forward(nn.Module):
