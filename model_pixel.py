@@ -48,12 +48,14 @@ class PixelCNN(b.Forward):
             grid = np.indices(self.shape)
             grid = grid.reshape(grid.shape[0], -1).transpose(1, 0)
             for idx in grid: # iterate over arbitrary dimensional grid
+                idx = f.int_tuple(idx)
                 # add batch and channel dim
                 img_in = Variable(img).unsqueeze(0).unsqueeze(0)
                 out = self.forward(img_in)
                 # 1 x 3*num_mix x shape -> shape x 3*num_mix -> 3*num_mix
-                out = f.cycle_axes(out[0], -1)[f.int_tuple(idx)]
-                img[idx] = logistic_mixture_sample(out.cpu().detach().numpy())
+                out = f.cycle_axes(out[0], -1)[idx]
+                sample = logistic_mixture_sample(out.cpu().detach().numpy())
+                img[idx] = sample
         return img
 
 class Pixel2d(nn.Module):

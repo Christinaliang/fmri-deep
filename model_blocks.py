@@ -14,6 +14,12 @@ Notes:
         7.0 -> 3.5 -> 7.0 vs 7 -> 3 -> 6
 """
 
+def print_gradsize(model):
+    for name, param in model.named_parameters():
+        if param.requires_grad and param.grad is not None:
+            ratio = np.abs((param.grad / param.data).detach().numpy())
+            print(name, np.max(ratio), np.mean(ratio), np.min(ratio))
+
 class Forward(nn.Module):
     """Defines a general architecture that takes in an image and computes a
     label directly.
@@ -29,6 +35,9 @@ class Forward(nn.Module):
             optimizer.zero_grad()
             output, loss = self.compute_loss(image, label)
             loss.backward()
+            
+            # print_gradsize(self)
+            
             optimizer.step()
         else:
             output, loss = self.compute_loss(image, label)
