@@ -44,7 +44,7 @@ def load_options(name):
         RestAtlasDataset pre-transformation: 401 x 200 (atlas x time)
         post-transformation: 1 x 400 x 200
         Transforms:
-        Reorder: gets rid of first atlas location (400)
+        Reorder: gets rid of first atlas location (401 -> 400)
         NormalizeSum: treat blood as distribution w/ fixed sum
         """
         tr = t.Transforms((t.Reorder(0, slice(1, None, None)),

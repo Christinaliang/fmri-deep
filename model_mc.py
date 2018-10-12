@@ -62,17 +62,22 @@ class MarkovChain(Transition):
         super().__init__()
         shape = np.roll(shape, 1)[1:] # remove time axis from shape
         size = f.size(shape) * ch
-        self.P = MarkovLinear(size)
+        # self.P = MarkovLinear(size)
+        self.P = nn.Linear(size, size) # include bias or not?
         self.criterion = nn.KLDivLoss()
         
     def next_frame(self, frame):
+        # frame is vector of probabilities, 
+        # but we want to work in the log prob domain
         shape = frame.shape
         frame = frame.view(shape[0], -1)
+        frame = torch.log(torch.clamp(frame, min=1e-6)) # log probs
         frame = self.P(frame)
         return frame.view(shape)
     
     def loss(self, output, label):
         """Assumes output and label are probabilities, applies KL div."""
-        output = torch.clamp(output, min=1e-6)
-        output = torch.log(output)
+        # output = torch.clamp(output, min=1e-6)
+        # output = torch.log(output)
+        output = F.log_softmax(output)
         return self.criterion(output, label)
